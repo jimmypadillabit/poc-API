@@ -1,0 +1,51 @@
+name: Deploy API to Azure APIM
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-apim:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install az cli and extensions
+        run: |
+          # Ensure az is present; azure/login provides several ways but ensure extension too
+          az --version || true
+          az extension add --name azure-cli-extensions || true
+
+      - name: Deploy/OpenAPI import to APIM
+        env:
+          AZ_RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          APIM_SERVICE_NAME: ${{ secrets.APIM_SERVICE_NAME }}
+          API_ID: ${{ secrets.APIM_API_ID }}
+          API_PATH: farmacias
+          OPENAPI_SPEC_PATH: openapi.yaml
+          SERVICE_URL: http://4.157.52.221/api
+        run: |
+          set -e
+          echo "Deploying API to APIM: $APIM_SERVICE_NAME in RG $AZ_RG"
+          # Optional: check if API exists and then import/overwrite
+          if az apim api show --resource-group "$AZ_RG" --service-name "$APIM_SERVICE_NAME" --api-id "$API_ID" >/dev/null 2>&1; then
+            echo "API exists. Importing will replace it."
+          else
+            echo "API not found. Proceeding to import."
+          fi
+          az apim api import --resource-group "$AZ_RG" --service-name "$APIM_SERVICE_NAME" --path "$API_PATH" --api-id "$API_ID" --specification-format OpenApi --specification-path "$OPENAPI_SPEC_PATH" --service-url "$SERVICE_URL"
+
+      - name: Confirm API Deployed
+        env:
+          AZ_RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          APIM_SERVICE_NAME: ${{ secrets.APIM_SERVICE_NAME }}
+          API_ID: ${{ secrets.APIM_API_ID }}
+        run: |
+          az apim api show --resource-group "$AZ_RG" --service-name "$APIM_SERVICE_NAME" --api-id "$API_ID" --query "{displayName:displayName, path:path, serviceUrl:serviceUrl}" -o table
