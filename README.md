@@ -40,6 +40,8 @@ Guarda el JSON resultante como secreto `AZURE_CREDENTIALS` en GitHub (Settings �
 - `APIM_GATEWAY_URL` : `https://apim-provefarma-demo.azure-api.net`.
 - `APIM_SUBSCRIPTION_KEY` : (opcional) Si tu APIM requiere suscripción, agrega la clave para el producto que expone la API.
 
+⚠️ Nota: si ya existe una API con `APIM_API_ID` (por ejemplo `api-mock-farmacia` en tu APIM), el workflow importará y **reemplazará** la definición y la `policy` si `policy.xml` está presente. Para preservar APIs existentes en el entorno de demo, usa un `APIM_API_ID` nuevo o revisa la política en `policy.xml` antes de ejecutar el workflow.
+
 
 ## Cómo funciona el workflow
 1. El workflow se dispara al hacer push en `main`.
