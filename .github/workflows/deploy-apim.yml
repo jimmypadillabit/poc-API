@@ -49,3 +49,44 @@ jobs:
           API_ID: ${{ secrets.APIM_API_ID }}
         run: |
           az apim api show --resource-group "$AZ_RG" --service-name "$APIM_SERVICE_NAME" --api-id "$API_ID" --query "{displayName:displayName, path:path, serviceUrl:serviceUrl}" -o table
+
+      - name: Apply policy (optional)
+        env:
+          AZ_RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          APIM_SERVICE_NAME: ${{ secrets.APIM_SERVICE_NAME }}
+          API_ID: ${{ secrets.APIM_API_ID }}
+          AZ_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          # If policy.xml exists, apply it to the API via the ARM REST API (PUT)
+          if [ -f policy.xml ]; then
+            echo "Applying policy from policy.xml"
+            POLICY_JSON=$(python3 - <<'PY'
+import json, sys
+print(json.dumps(open('policy.xml').read()))
+PY
+)
+            BODY='{"format":"rawxml","value":'$POLICY_JSON'}'
+            URI="https://management.azure.com/subscriptions/$AZ_SUBSCRIPTION_ID/resourceGroups/$AZ_RG/providers/Microsoft.ApiManagement/service/$APIM_SERVICE_NAME/apis/$API_ID/policy?api-version=2021-08-01"
+            az rest --method PUT --uri "$URI" --body "$BODY"
+          else
+            echo "No policy.xml found; skipping policy application."
+          fi
+
+      - name: Test endpoint (post-deploy)
+        env:
+          APIM_GATEWAY_URL: ${{ secrets.APIM_GATEWAY_URL }}
+          APIM_SUBSCRIPTION_KEY: ${{ secrets.APIM_SUBSCRIPTION_KEY }}
+        run: |
+          set -e
+          URL="${APIM_GATEWAY_URL}/api/farmacias/disponibilidad?medicamento=paracetamol&ciudad=quito"
+          echo "Testing endpoint: $URL"
+          if [ -z "$APIM_SUBSCRIPTION_KEY" ]; then
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          else
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Ocp-Apim-Subscription-Key: $APIM_SUBSCRIPTION_KEY" "$URL")
+          fi
+          echo "HTTP status code: $CODE"
+          if [ "$CODE" -ne 200 ]; then
+            echo "Test failed with status $CODE" >&2
+            exit 1
+          fi

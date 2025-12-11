@@ -1,0 +1,15 @@
+<policies>
+  <inbound>
+    <base />
+    <!-- Set backend to the demo backend -->
+    <set-backend-service base-url="http://4.157.52.221/api" />
+    <!-- Remove subscription header for demo purposes (NOT for production) -->
+    <remove-header name="Ocp-Apim-Subscription-Key" />
+  </inbound>
+  <outbound>
+    <base />
+  </outbound>
+  <backend>
+    <base />
+  </backend>
+</policies>
