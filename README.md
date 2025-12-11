@@ -32,17 +32,15 @@ Guarda el JSON resultante (incluye appId, password, tenant) como secreto `AZURE_
 Guarda el JSON resultante como secreto `AZURE_CREDENTIALS` en GitHub (Settings → Secrets and variables → Actions → New repository secret).
 
 ## GitHub Secrets que necesitarás (repo settings → Secrets):
-- `AZURE_CREDENTIALS` : El JSON devuelto por `az ad sp create-for-rbac`.
-- `AZURE_RESOURCE_GROUP` : `rg-demo-provefarma-apim`.
-- `APIM_SERVICE_NAME` : `apim-provefarma-demo`.
-- `APIM_API_ID` : Un id único para la API dentro de APIM (ej: `demo-api-farmacia`).
-- `AZURE_SUBSCRIPTION_ID` : `a407594f-18e1-4ed7-b941-507c946bb6b3`.
-- `APIM_GATEWAY_URL` : `https://apim-provefarma-demo.azure-api.net`.
-- `APIM_SUBSCRIPTION_KEY` : (opcional) Si tu APIM requiere suscripción, agrega la clave para el producto que expone la API.
+
+### Secrets para API Comercios (nuevo job `deploy-comercios`)
+- `APIM_API_ID_COMERCIOS` : `api-comercios` (ejemplo) — asegurarse de que **este ID no exista** actualmente en APIM para evitar reemplazos.
+- `APIM_GATEWAY_URL` : (reuse) `https://apim-provefarma-demo.azure-api.net`.
+- `APIM_SUBSCRIPTION_KEY` : (opcional) Si el APIM requiere suscripción para la prueba.
 
 ⚠️ Nota: si ya existe una API con `APIM_API_ID` (por ejemplo `api-mock-farmacia` en tu APIM), el workflow importará y **reemplazará** la definición y la `policy` si `policy.xml` está presente. Para preservar APIs existentes en el entorno de demo, usa un `APIM_API_ID` nuevo o revisa la política en `policy.xml` antes de ejecutar el workflow.
 
-
+Nota: se agregó un job adicional `deploy-comercios` que desplegará la API `api-comercios` si no existe; si ya existe, abortará para evitar sobrescribir la API/policy ya en uso (esto protege el contenido existente en APIM). Si deseas actualizar/complementar un API existente, cambia `APIM_API_ID_COMERCIOS` al ID correspondiente y entiende que el job abortará si el ID ya era usado; cambie la lógica en el workflow si quiere `import` con replace.
 ## Cómo funciona el workflow
 1. El workflow se dispara al hacer push en `main`.
 2. Hace login con `azure/login` (usando `AZURE_CREDENTIALS`).

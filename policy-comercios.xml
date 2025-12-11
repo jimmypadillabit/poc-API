@@ -1,0 +1,15 @@
+<policies>
+  <inbound>
+    <base />
+    <!-- Route all requests to the existing backend farmacias disponibilidad for demo -->
+    <set-backend-service base-url="http://4.157.52.221/api/farmacias/disponibilidad" />
+    <!-- Remove subscription header for demo purposes (does not affect other APIs) -->
+    <remove-header name="Ocp-Apim-Subscription-Key" />
+  </inbound>
+  <outbound>
+    <base />
+  </outbound>
+  <backend>
+    <base />
+  </backend>
+</policies>

@@ -90,3 +90,96 @@ PY
             echo "Test failed with status $CODE" >&2
             exit 1
           fi
+
+  deploy-comercios:
+    runs-on: ubuntu-latest
+    needs: deploy-apim
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install az cli and extensions
+        run: |
+          az --version || true
+          az extension add --name azure-cli-extensions || true
+
+      - name: Prepare variables
+        env:
+          AZ_RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          APIM_SERVICE_NAME: ${{ secrets.APIM_SERVICE_NAME }}
+          API_ID: ${{ secrets.APIM_API_ID_COMERCIOS }}
+          API_PATH: comercios
+          OPENAPI_SPEC_PATH: openapi-comercios.yaml
+          SERVICE_URL: http://4.157.52.221/api
+        run: |
+          echo "Preparing deployment for API ID: $API_ID (path: $API_PATH)"
+
+      - name: Check API does not exist (safety)
+        env:
+          AZ_RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          APIM_SERVICE_NAME: ${{ secrets.APIM_SERVICE_NAME }}
+          API_ID: ${{ secrets.APIM_API_ID_COMERCIOS }}
+        run: |
+          echo "Checking if API $API_ID exists in APIM $APIM_SERVICE_NAME"
+          if az apim api show --resource-group "$AZ_RG" --service-name "$APIM_SERVICE_NAME" --api-id "$API_ID" >/dev/null 2>&1; then
+            echo "ERROR: API with id $API_ID already exists in APIM. To avoid replacing existing APIs/policies this job will abort." >&2
+            exit 1
+          else
+            echo "No existing API with id $API_ID found. Proceeding to import."
+          fi
+
+      - name: Import Comercios OpenAPI
+        env:
+          AZ_RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          APIM_SERVICE_NAME: ${{ secrets.APIM_SERVICE_NAME }}
+          API_ID: ${{ secrets.APIM_API_ID_COMERCIOS }}
+          API_PATH: comercios
+          OPENAPI_SPEC_PATH: openapi-comercios.yaml
+          SERVICE_URL: http://4.157.52.221/api
+        run: |
+          az apim api import --resource-group "$AZ_RG" --service-name "$APIM_SERVICE_NAME" --path "$API_PATH" --api-id "$API_ID" --specification-format OpenApi --specification-path "$OPENAPI_SPEC_PATH" --service-url "$SERVICE_URL"
+
+      - name: Apply Comercios policy (optional)
+        env:
+          AZ_RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          APIM_SERVICE_NAME: ${{ secrets.APIM_SERVICE_NAME }}
+          API_ID: ${{ secrets.APIM_API_ID_COMERCIOS }}
+          AZ_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          if [ -f policy-comercios.xml ]; then
+            echo "Applying policy-comercios.xml to API $API_ID"
+            POLICY_JSON=$(python3 - <<'PY'
+import json, sys
+print(json.dumps(open('policy-comercios.xml').read()))
+PY
+)
+            BODY='{"format":"rawxml","value":'$POLICY_JSON'}'
+            URI="https://management.azure.com/subscriptions/$AZ_SUBSCRIPTION_ID/resourceGroups/$AZ_RG/providers/Microsoft.ApiManagement/service/$APIM_SERVICE_NAME/apis/$API_ID/policy?api-version=2021-08-01"
+            az rest --method PUT --uri "$URI" --body "$BODY"
+          else
+            echo "No policy-comercios.xml found; skipping policy application."
+          fi
+
+      - name: Test Comercios endpoint (post-deploy)
+        env:
+          APIM_GATEWAY_URL: ${{ secrets.APIM_GATEWAY_URL }}
+          APIM_SUBSCRIPTION_KEY: ${{ secrets.APIM_SUBSCRIPTION_KEY }}
+        run: |
+          set -e
+          URL="${APIM_GATEWAY_URL}/api/comercios/disponibilidad?medicamento=paracetamol&ciudad=quito"
+          echo "Testing Comercios endpoint: $URL"
+          if [ -z "$APIM_SUBSCRIPTION_KEY" ]; then
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          else
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Ocp-Apim-Subscription-Key: $APIM_SUBSCRIPTION_KEY" "$URL")
+          fi
+          echo "HTTP status code: $CODE"
+          if [ "$CODE" -ne 200 ]; then
+            echo "Test failed with status $CODE" >&2
+            exit 1
+          fi

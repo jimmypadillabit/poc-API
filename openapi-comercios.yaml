@@ -1,0 +1,38 @@
+openapi: 3.0.1
+info:
+  title: API Comercios - APIM Demo
+  version: "1.0"
+servers:
+  - url: https://{APIM_HOST}/api
+    variables:
+      APIM_HOST:
+        default: apim-provefarma-demo.azure-api.net
+paths:
+  /comercios/disponibilidad:
+    get:
+      summary: Disponibilidad Comercios
+      operationId: disponibilidad-comercios
+      parameters:
+        - name: medicamento
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: ciudad
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  disponibles:
+                    type: integer
+                  comercio:
+                    type: string
+components: {}
